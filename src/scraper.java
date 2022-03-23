@@ -68,7 +68,6 @@ public class Scraper {
     }
 
     public static void main(String[] args) {
-        System.out.println("Hello World!");
         String startDate = "2021-10-21";
         Scraper scraper = new Scraper();
 
