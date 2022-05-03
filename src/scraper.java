@@ -68,7 +68,7 @@ public class Scraper {
     }
 
     public static void main(String[] args) {
-        String startDate = "2021-10-21";
+        String startDate = "2022-01-06";
         Scraper scraper = new Scraper();
 
         LocalDate currDate = LocalDate.parse(startDate);
