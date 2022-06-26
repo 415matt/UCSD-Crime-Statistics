@@ -1,8 +1,39 @@
+#TODO: parse arrest data
+
+from os import listdir
+from os.path import isfile, join
+
 import pdfplumber
 import unicodedata
 import csv
-from os import listdir
-from os.path import isfile, join
+
+
+class Event:
+    def __init__(self):
+        self.incident = ""
+        self.location = ""
+        self.dt_reported = ""
+        self.case_num = ""
+        self.dt_occured = ""
+        self.time_occured = ""
+        self.summary = ""
+        self.disposition = ""
+    
+    def __str__(self):
+        return ','.join([self.incident, self.location, self.dt_reported, 
+                        self.case_num, self.dt_occured, self.time_occured, 
+                        self.summary, self.disposition])
+
+
+class Arrest:
+    def __init__(self):
+        self.date = ""
+        self.time = ""
+        self.name = ""
+        self.dob = ""
+        self.description = ""
+        self.occupation = ""
+        self.charge = ""
 
 
 def pdf_to_string(path):
@@ -10,8 +41,8 @@ def pdf_to_string(path):
 
     output_string = ""
 
+    # extract and append text from each page
     with pdfplumber.open(path) as pdf:
-        # extract and append text from each page
         for curr_page in pdf.pages:
             output_string += curr_page.extract_text()
 
@@ -20,76 +51,78 @@ def pdf_to_string(path):
 
 
 def parse(pdf_string):
-    """Parses the given PDF string"""
+    """Parses the given string, returns a list of event objects"""
 
-    pdf_arr = pdf_string.splitlines()  # each line is an element in the list
+    # create and store Event objects
+    event = Event()
+    pdf_events = []
 
-    csv_rows = []  # stores each event[]
-    i = 0
-    while i < len(pdf_arr):
+    # iterate through each line in the pdf
+    pdf_arr = pdf_string.splitlines()
+    for i in range(len(pdf_arr)):
+        
+        curr_line = pdf_arr[i]
 
-        # build event with required fields
-        event = []
-        while len(event) != 8 and i < len(pdf_arr):  # populate
-            curr_line = pdf_arr[i]
+        if "Date Reported" in curr_line:
+            # incident
+            event.incident = str(pdf_arr[i - 2])
+            # location
+            event.location = str(pdf_arr[i - 1])
+            # date reported
+            curr_line = curr_line.replace("Date Reported ", "")
+            event.dt_reported = curr_line
 
-            if "Date Reported" in curr_line:
-                # append incident
-                event.append(pdf_arr[i - 2])
-                # append location
-                event.append(pdf_arr[i - 1])
-                # append Date Reported
-                event.append(curr_line.replace("Date Reported ", ""))
+        elif "Incident/Case#" in curr_line:
+            curr_line = curr_line.replace("Incident/Case# ", "")
+            event.case_num = curr_line
 
-            elif "Incident/Case#" in curr_line:
-                event.append(curr_line.replace("Incident/Case# ", ""))
+        elif "Date Occurred" in curr_line:
+            curr_line = curr_line.replace("Date Occurred ", "")
+            event.dt_occured = curr_line
 
-            elif "Date Occurred" in curr_line:
-                event.append(curr_line.replace("Date Occurred ", ""))
+        elif "Time Occurred" in curr_line:
+            curr_line = curr_line.replace("Time Occurred ", "")
+            event.time_occured = curr_line
 
-            elif "Time Occurred" in curr_line:
-                event.append(curr_line.replace("Time Occurred ", ""))
+        elif "Summary" in curr_line:
+            summary = ""
 
-            elif "Summary" in curr_line:
-                summary = ""
+            if "Disposition" in pdf_arr[i + 1]:
+                summary = curr_line
+            # combine multi-line summaries
+            else:
+                j = i
+                while "Disposition" not in pdf_arr[j]:
+                    summary += pdf_arr[j]
+                    j += 1
 
-                if "Disposition" in pdf_arr[i + 1]:
-                    summary = curr_line
-                else:
-                    # combine multi-line summaries
-                    j = i
-                    while "Disposition" not in pdf_arr[j]:
-                        summary += pdf_arr[j]
-                        j += 1
+            summary = summary.replace("Summary:", "").replace(" ", "", 1)
+            event.summary = summary
 
-                event.append(summary.replace("Summary:", "").replace(" ", "", 1))
+        elif "Disposition" in curr_line:
+            curr_line = curr_line.replace("Disposition: ", "").replace("UCSD POLICE DEPARTMENT ", "")
+            event.disposition = curr_line
 
-            elif "Disposition" in curr_line:
-                event.append(curr_line.replace("Disposition: ", "").replace("UCSD POLICE DEPARTMENT ", ""))
-
-            i += 1  # next line
-
-        # add to be written to csv
-        if len(event) == 8:
-            csv_rows.append(event)
-
-    return csv_rows
+            # add event object to the list & reset
+            pdf_events.append(event)
+            event = Event()
+            
+    return pdf_events
 
 
 filepaths = listdir("../logs/")
-files = []
-
-for path in filepaths:
-    files.append(parse(pdf_to_string("../logs/" + path)))
-
 
 # Write to CSV
-with open('main.csv', 'w', newline='', encoding='utf-8') as file:
+with open('../main.csv', 'w', newline='', encoding='utf-8') as file:
     writer = csv.writer(file)
+    
     # Heading row
     writer.writerow(["Incident", "Location", "Date Reported", "Incident/Case#",
                      "Date Occurred", "Time Occurred", "Summary", "Disposition"])
 
-    for arr in files:
-        for row in arr:
-            writer.writerow(row)  # write the generated row to csv
+    # iterate through each pdf and add their events each as a row in csv
+    for filepath in filepaths:
+        events = parse("../logs/" + filepath)
+
+        for event in events:
+            writer.writerow(str(event))
