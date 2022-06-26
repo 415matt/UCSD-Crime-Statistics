@@ -19,10 +19,15 @@ class Event:
         self.summary = ""
         self.disposition = ""
     
-    def __str__(self):
-        return ','.join([self.incident, self.location, self.dt_reported, 
-                        self.case_num, self.dt_occured, self.time_occured, 
-                        self.summary, self.disposition])
+    def to_list(self):
+        return [self.incident, 
+                self.location, 
+                self.dt_reported, 
+                self.case_num, 
+                self.dt_occured, 
+                self.time_occured, 
+                self.summary, 
+                self.disposition]
 
 
 class Arrest:
@@ -49,7 +54,6 @@ def pdf_to_string(path):
     # Normalize to replace non UTF-8 unicode from strings
     return unicodedata.normalize('NFKC', output_string).replace("‐", "-")
 
-
 def parse(pdf_string):
     """Parses the given string, returns a list of event objects"""
 
@@ -60,7 +64,7 @@ def parse(pdf_string):
     # iterate through each line in the pdf
     pdf_arr = pdf_string.splitlines()
     for i in range(len(pdf_arr)):
-        
+
         curr_line = pdf_arr[i]
 
         if "Date Reported" in curr_line:
@@ -110,10 +114,10 @@ def parse(pdf_string):
     return pdf_events
 
 
-filepaths = listdir("../logs/")
+filepaths = listdir("logs/")
 
 # Write to CSV
-with open('../main.csv', 'w', newline='', encoding='utf-8') as file:
+with open('main.csv', 'w', newline='', encoding='utf-8') as file:
     writer = csv.writer(file)
     
     # Heading row
@@ -122,7 +126,7 @@ with open('../main.csv', 'w', newline='', encoding='utf-8') as file:
 
     # iterate through each pdf and add their events each as a row in csv
     for filepath in filepaths:
-        events = parse("../logs/" + filepath)
+        events = parse(pdf_to_string("logs/" + filepath))
 
         for event in events:
-            writer.writerow(str(event))
+            writer.writerow(event.to_list())
